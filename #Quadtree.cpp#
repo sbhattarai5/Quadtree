@@ -1,0 +1,215 @@
+#include <iostream>
+#include <vector>
+
+//Temporary untill I get the demo file
+//************************************************//
+int W = 100;
+int H = 100;
+int MAX_DEPTH = 8;
+int MAX_OBJS_BEFORE_DIVISION = 10;
+
+class Surface
+{
+public:
+    void draw()
+    { /* Draws on the surface */  return; }
+    };
+//************************************************//
+
+//The object that we're trying to manupulate the collisions on
+//In our case, it is a ball, hence, we have properties like "color", "radius"
+class Game_object
+{
+public:
+    Game_object(int x, int y)
+    : _radius(1), _dx(1), _dy(1)
+    {}
+    void move()
+    {
+        position.x() += _dx;
+        position.y() += _dy;
+        //If the ball collides in the end of the surface with the walls, we change the direction
+        if (position.x() - _radius <= 0 || position.x() + _radius >= W - 1) _dx = -dx_;
+        if (position.y() - _radius <= 0 || position.y() + _radius >= H - 1) _dy = -dy_;
+        return;
+    }
+    void const & position() const
+    {
+        return _position;
+    }
+    static int radius() const { return _radius; }
+    static void inc_radius() { ++_radius; } //Increases the radius of the game Game_object
+    void draw()
+    {
+        //********************
+        //Temporary
+        _surface->draw(); //Should draw on the screen
+        //********************
+    }
+
+private:
+    Pos_vector _position;
+    int _dx;       //Rate of change of x-coordinate
+    int _dy;       //Rate of change of y-coordinate
+    //Color color; //Has a color as well in our case
+    static int _radius;   //We have a ball which also has a property called radius
+    static Surface * _surface;
+};
+
+
+class Node
+{
+public:
+    Node (int d=0, Node * p=NULL, int x_min=0, int x_max=W,
+          int y_min=0, int y_max=H)
+    : _depth(d), _parent(p), _x_min(x_min),
+    _x_max(x_max), _y_min(y_min), _y_max(y_max)
+    {}
+    int depth () const { return _depth; }
+    int & depth () { return _depth; }
+    void divide()
+    {
+        int half_x = (_x_min + _x_max) / 2;
+        int half_y = (_y_min + _y_max) / 2;  //check the math //off by 1 error
+        _children.push_back(new Node(_depth + 1, this, _x_min, half_x + 1, y_min, half_y + 1));
+        _children.push_back(new Node(_depth + 1, this, _x_min, half_x + 1, half_y + 1, _y_max));
+        _children.push_back(new Node(_depth + 1, this, half_x + 1, _x_max, y_min, half_y + 1));
+        _children.push_back(new Node(_depth + 1, this, half_x + 1, _x_max, half_y + 1, _y_max));
+        return;
+    }
+    int height() const
+    {
+        if (_children.size() == 0) return 0;
+        int max_height = -1;
+        for (int i = 0; i < _children.size(); ++i)
+        {
+            int height = _children[i]->height();
+            if (height > max_height) max_height = height;
+        }
+        return max_height + 1;
+    }
+    void clear()
+    {
+        for (int i = 0; i < _children.size(); ++i)
+        {
+            _children[i].clear()
+            delete _children[i];
+        }
+        return;
+    }
+    void add(Game_object * gobj)
+    {
+        if (_children.size() == 0)
+        {
+            if(g_objs.size() >= MAX_OBJS_BEFORE_DIVISION && _depth != MAX_DEPTH)
+            {
+                divide();
+                g_objs.push_back(gobj);
+                for (int i = 0; i < g_objs.size(); ++i)
+                {
+                    Pos_vector pos = g_objs[i].position();
+                    if ((pos.x() > x_min - Game_object::radius() && pos.x() < half_x + 1 + Game_object::radius()) ||
+                        (pos.y() > y_min - Game_object::radius() && pos.y() < half_y + 1 + Game_object::radius()))
+                    {
+                        g_objs_on_line.push_back(gobjs[i]);
+                        continue;
+                    }
+                    for (int i = 0; i < _children.size(); ++i)
+                    {
+                        if (pos.x() >= _children._x_min && pos.x() < _children._x_max && pos.y() >= _children._y_min && pos.y() < _children._y_min)
+                        {
+                            _children.add(g_objs[i]);
+                            break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                g_objs.push_back(gobj);
+            }
+        }
+        else
+        {
+            Pos_vector pos = g_obj.position();
+            if ((pos.x() > x_min - Game_object::radius() && pos.x() < half_x + 1 + Game_object::radius()) ||
+                (pos.y() > y_min - Game_object::radius() && pos.y() < half_y + 1 + Game_object::radius()))
+            {
+                g_objs_on_line.push_back(gobj);
+                continue;
+            }
+            for (int i = 0; i < _children.size(); ++i)
+            {
+                if (pos.x() >= _children._x_min && pos.x() < _children._x_max && pos.y() >= _children._y_min && pos.y() < _children._y_min)
+                {
+                    _children.add(g_obj);
+                    break;
+                }
+            }
+        }
+    }
+private:
+    int _depth;
+    Node * _parent;
+    std::vector< Game_object * > g_objs; //has game objects
+    std::vector< Game_object * > g_objs_on_line; //all the objects that are on the line
+    std::vector< Node *> _children;  //has atmost 4 childrens
+    int _x_min;
+    int _x_max;
+    int _y_min;
+    int _y_max;
+};
+
+class Quadtree
+{
+public:
+    Quadtree()
+    : _root(NULL), _height(-1)
+    {}
+    void add(Game_object * gobj)
+    {
+        //see if on the call and then call add recursively
+        if (gobj == NULL) return;
+        if (_root == NULL)
+        {
+            _root = new Node();
+        }
+        _root.add(gobj);
+        all_the_nodes.push_back(gobj);
+    }
+    int height() const
+    {
+        if (_root == NULL) return -1;
+        return _root.height();
+    }
+    void clear()
+    {
+        if (_root == NULL) return;
+        _root.clear();
+        delete _root;
+    }
+    void reinitialize()
+    {
+        for (int i = 0; i < all_the_nodes.size(); ++i)
+        {
+            add(all_the_nodes[i]);
+        }
+    }
+    ~Quadtree()
+    {
+        clear();
+        for (int i = 0; i < all_the_nodes.size(); ++i)
+        {
+            delete all_the_nodes[i];
+        }
+    }
+private:
+    Node * _root;
+    std::vector<Game_object *> all_the_nodes;
+};
+
+int main()
+{
+
+    return 0;
+}
